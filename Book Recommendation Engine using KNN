@@ -1,0 +1,42 @@
+import pandas as pd
+import numpy as np
+from sklearn.neighbors import NearestNeighbors
+from scipy.sparse import csr_matrix
+import io # Import io for handling uploaded files
+ df = pd.read_csv('/path/to/your/data.csv')
+if 'df' not in locals():
+    print("Error: DataFrame 'df' not loaded. Please add your data loading code.")
+else:
+    if all(col in df.columns for col in ['User-ID', 'Book-Rating', 'Book-Title']):
+        user_counts = df.groupby('User-ID')['Book-Rating'].count()
+        book_counts = df.groupby('Book-Title')['Book-Rating'].count()
+
+        active_users = user_counts[user_counts >= 200].index
+        popular_books = book_counts[book_counts >= 100].index
+
+        df_filtered = df[df['User-ID'].isin(active_users) & df['Book-Title'].isin(popular_books)]
+        if not df_filtered.empty:
+            book_user_matrix = df_filtered.pivot_table(index='Book-Title', columns='User-ID', values='Book-Rating').fillna(0)
+            book_user_sparse = csr_matrix(book_user_matrix.values)
+            model = NearestNeighbors(metric='cosine', algorithm='brute')
+            model.fit(book_user_sparse)
+            def get_recommends(book_title):
+                if book_title not in book_user_matrix.index:
+                    print(f"Book title '{book_title}' not found in the filtered data.")
+                    return [book_title, []]
+
+                book_idx = book_user_matrix.index.get_loc(book_title)
+                distances, indices = model.kneighbors(book_user_matrix.iloc[book_idx, :].values.reshape(1, -1), n_neighbors=6)
+
+                recommended_books = []
+                for i in range(1, len(distances[0])):  # skip the input book itself
+                    recommended_books.append([
+                        book_user_matrix.index[indices[0][i]],
+                        float(distances[0][i])
+                    ])
+
+                return [book_title, recommended_books]
+        else:
+            print("Error: Filtered DataFrame is empty. Check your data and filtering criteria.")
+    else:
+        print("Error: DataFrame does not contain expected columns ('User-ID', 'Book-Rating', 'Book-Title').")

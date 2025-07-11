@@ -1,0 +1,36 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+data = pd.get_dummies(insurance, columns=['sex', 'smoker', 'region'], drop_first=True)
+train_dataset, test_dataset = train_test_split(data, test_size=0.2, random_state=42)
+
+train_labels = train_dataset.pop('expenses')
+test_labels = test_dataset.pop('expenses')
+scaler = StandardScaler()
+train_dataset_scaled = scaler.fit_transform(train_dataset)
+test_dataset_scaled = scaler.transform(test_dataset)
+import tensorflow as tf
+from tensorflow.keras import layers, models
+
+model = models.Sequential([
+    layers.Dense(64, activation='relu', input_shape=(train_dataset_scaled.shape[1],)),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(1)
+])
+
+model.compile(optimizer='adam', loss='mae', metrics=['mae'])
+history = model.fit(train_dataset_scaled, train_labels, epochs=100, validation_split=0.2, verbose=0)
+loss, mae = model.evaluate(test_dataset_scaled, test_labels, verbose=2)
+print("Mean Absolute Error on test set: ", mae)
+predictions = model.predict(test_dataset_scaled).flatten()
+
+import matplotlib.pyplot as plt
+plt.figure(figsize=(8, 6))
+plt.scatter(test_labels, predictions)
+plt.xlabel("True Values [Expenses]")
+plt.ylabel("Predictions [Expenses]")
+plt.axis('equal')
+plt.axis('square')
+plt.plot([-1000, 50000], [-1000, 50000])
+plt.show()
